@@ -11,9 +11,17 @@ const char* password = WIFI_PASSWORD;
 WebServer server(80);
 Adafruit_MPU6050 mpu;
 
+// Accelerometer
 float ax = 0;
 float ay = 0;
 float az = 0;
+
+// Gyroscope
+float gx = 0;
+float gy = 0;
+float gz = 0;
+
+// Temperature
 float tempC = 0;
 
 void handleRoot()
@@ -27,7 +35,7 @@ void handleRoot()
 
 <style>
 body{
-  font-family: Arial, sans-serif;
+  font-family:Arial,sans-serif;
   text-align:center;
 }
 
@@ -42,7 +50,6 @@ canvas{
   margin:10px;
 }
 </style>
-
 </head>
 
 <body>
@@ -52,6 +59,11 @@ canvas{
 <div class="info" id="ax">AX:</div>
 <div class="info" id="ay">AY:</div>
 <div class="info" id="az">AZ:</div>
+
+<div class="info" id="gx">GX:</div>
+<div class="info" id="gy">GY:</div>
+<div class="info" id="gz">GZ:</div>
+
 <div class="info" id="temp">TEMP:</div>
 
 <canvas id="graph" width="900" height="400"></canvas>
@@ -84,7 +96,6 @@ function drawLine(data,color)
     {
         let x = i * (canvas.width / MAX_POINTS);
 
-        // scale for roughly +/- 12 m/s²
         let y = canvas.height/2 - data[i]*15;
 
         if(i===0)
@@ -128,6 +139,15 @@ async function updateData()
         document.getElementById("az").innerHTML =
             "AZ: " + d.az.toFixed(2);
 
+        document.getElementById("gx").innerHTML =
+            "GX: " + d.gx.toFixed(2);
+
+        document.getElementById("gy").innerHTML =
+            "GY: " + d.gy.toFixed(2);
+
+        document.getElementById("gz").innerHTML =
+            "GZ: " + d.gz.toFixed(2);
+
         document.getElementById("temp").innerHTML =
             "TEMP: " + d.temp.toFixed(2) + " °C";
 
@@ -166,6 +186,9 @@ void handleData()
   json += "\"ax\":" + String(ax,2) + ",";
   json += "\"ay\":" + String(ay,2) + ",";
   json += "\"az\":" + String(az,2) + ",";
+  json += "\"gx\":" + String(gx,2) + ",";
+  json += "\"gy\":" + String(gy,2) + ",";
+  json += "\"gz\":" + String(gz,2) + ",";
   json += "\"temp\":" + String(tempC,2);
   json += "}";
 
@@ -182,6 +205,7 @@ void setup()
   if(!mpu.begin())
   {
     Serial.println("MPU6050 not found!");
+
     while(1)
     {
       delay(100);
@@ -198,7 +222,7 @@ void setup()
 
   Serial.print("Connecting");
 
-  while(WiFi.status()!=WL_CONNECTED)
+  while(WiFi.status() != WL_CONNECTED)
   {
     delay(500);
     Serial.print(".");
@@ -220,12 +244,20 @@ void setup()
 void loop()
 {
   sensors_event_t a, g, temp;
+
   mpu.getEvent(&a, &g, &temp);
 
+  // Accelerometer (m/s²)
   ax = a.acceleration.x;
   ay = a.acceleration.y;
   az = a.acceleration.z;
 
+  // Gyroscope (rad/s)
+  gx = g.gyro.x;
+  gy = g.gyro.y;
+  gz = g.gyro.z;
+
+  // Temperature
   tempC = temp.temperature;
 
   server.handleClient();
