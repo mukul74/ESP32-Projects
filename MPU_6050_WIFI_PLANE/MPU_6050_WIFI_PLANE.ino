@@ -1,8 +1,10 @@
+
 #include <WiFi.h>
 #include <WebServer.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 #include <Wire.h>
+#include <math.h>
 #include "secrets.h"
 
 const char* ssid = WIFI_SSID;
@@ -24,6 +26,10 @@ float gz = 0;
 // Temperature
 float tempC = 0;
 
+// Roll and Pitch (Degrees)
+float roll = 0;
+float pitch = 0;
+
 void handleRoot()
 {
   String page = R"rawliteral(
@@ -31,23 +37,24 @@ void handleRoot()
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ESP32 MPU6050 Graph</title>
+<title>ESP32 MPU6050 Live Monitor</title>
 
 <style>
 body{
-  font-family:Arial,sans-serif;
-  text-align:center;
+    font-family:Arial,sans-serif;
+    text-align:center;
+    margin:20px;
 }
 
 canvas{
-  border:1px solid black;
-  width:95%;
-  max-width:900px;
+    border:1px solid black;
+    width:95%;
+    max-width:900px;
 }
 
 .info{
-  font-size:20px;
-  margin:10px;
+    font-size:20px;
+    margin:5px;
 }
 </style>
 </head>
@@ -65,6 +72,9 @@ canvas{
 <div class="info" id="gz">GZ:</div>
 
 <div class="info" id="temp">TEMP:</div>
+
+<div class="info" id="roll">ROLL:</div>
+<div class="info" id="pitch">PITCH:</div>
 
 <canvas id="graph" width="900" height="400"></canvas>
 
@@ -96,9 +106,9 @@ function drawLine(data,color)
     {
         let x = i * (canvas.width / MAX_POINTS);
 
-        let y = canvas.height/2 - data[i]*15;
+        let y = canvas.height/2 - data[i] * 15;
 
-        if(i===0)
+        if(i === 0)
             ctx.moveTo(x,y);
         else
             ctx.lineTo(x,y);
@@ -151,6 +161,12 @@ async function updateData()
         document.getElementById("temp").innerHTML =
             "TEMP: " + d.temp.toFixed(2) + " °C";
 
+        document.getElementById("roll").innerHTML =
+            "ROLL: " + d.roll.toFixed(2) + " °";
+
+        document.getElementById("pitch").innerHTML =
+            "PITCH: " + d.pitch.toFixed(2) + " °";
+
         pushData(axData,d.ax);
         pushData(ayData,d.ay);
         pushData(azData,d.az);
@@ -163,6 +179,7 @@ async function updateData()
     }
 }
 
+updateData();
 setInterval(updateData,100);
 
 </script>
@@ -183,13 +200,20 @@ Blue = AZ
 void handleData()
 {
   String json = "{";
+
   json += "\"ax\":" + String(ax,2) + ",";
   json += "\"ay\":" + String(ay,2) + ",";
   json += "\"az\":" + String(az,2) + ",";
+
   json += "\"gx\":" + String(gx,2) + ",";
   json += "\"gy\":" + String(gy,2) + ",";
   json += "\"gz\":" + String(gz,2) + ",";
-  json += "\"temp\":" + String(tempC,2);
+
+  json += "\"temp\":" + String(tempC,2) + ",";
+
+  json += "\"roll\":" + String(roll,2) + ",";
+  json += "\"pitch\":" + String(pitch,2);
+
   json += "}";
 
   server.send(200, "application/json", json);
@@ -230,6 +254,7 @@ void setup()
 
   Serial.println();
   Serial.println("WiFi Connected");
+
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
 
@@ -259,6 +284,13 @@ void loop()
 
   // Temperature
   tempC = temp.temperature;
+
+  // Roll and Pitch from Accelerometer
+  roll  = atan2(ay, az);
+  pitch = atan2(-ax, sqrt(ay * ay + az * az));
+
+  roll  = roll * 180.0 / PI;
+  pitch = pitch * 180.0 / PI;
 
   server.handleClient();
 
